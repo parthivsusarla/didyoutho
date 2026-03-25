@@ -1,0 +1,198 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model activity_logs {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String?   @db.Uuid
+  task_id    String?   @db.Uuid
+  action     String?
+  xp_earned  Int?      @default(0)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  tasks      tasks?    @relation(fields: [task_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users      users?    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model group_members {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  group_id  String?   @db.Uuid
+  user_id   String?   @db.Uuid
+  role      String?   @default("member")
+  joined_at DateTime? @default(now()) @db.Timestamp(6)
+  groups    groups?   @relation(fields: [group_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users     users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([group_id, user_id])
+}
+
+model groups {
+  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String
+  description   String?
+  created_by    String?         @db.Uuid
+  group_streak  Int?            @default(0)
+  created_at    DateTime?       @default(now()) @db.Timestamp(6)
+  group_members group_members[]
+  users         users?          @relation(fields: [created_by], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  messages      messages[]
+  polls         polls[]
+  tasks         tasks[]
+}
+
+model messages {
+  id                                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sender_id                         String?   @db.Uuid
+  group_id                          String?   @db.Uuid
+  receiver_id                       String?   @db.Uuid
+  content                           String?
+  message_type                      String?
+  created_at                        DateTime? @default(now()) @db.Timestamp(6)
+  groups                            groups?   @relation(fields: [group_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_messages_receiver_idTousers users?    @relation("messages_receiver_idTousers", fields: [receiver_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_messages_sender_idTousers   users?    @relation("messages_sender_idTousers", fields: [sender_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model notifications {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String?   @db.Uuid
+  type       String?
+  content    String?
+  is_read    Boolean?  @default(false)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  users      users?    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model poll_options {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  poll_id     String?      @db.Uuid
+  option_text String?
+  polls       polls?       @relation(fields: [poll_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  poll_votes  poll_votes[]
+}
+
+model poll_votes {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  poll_id      String?       @db.Uuid
+  option_id    String?       @db.Uuid
+  user_id      String?       @db.Uuid
+  poll_options poll_options? @relation(fields: [option_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  polls        polls?        @relation(fields: [poll_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users        users?        @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([poll_id, user_id])
+}
+
+model polls {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  group_id     String?        @db.Uuid
+  created_by   String?        @db.Uuid
+  question     String?
+  created_at   DateTime?      @default(now()) @db.Timestamp(6)
+  poll_options poll_options[]
+  poll_votes   poll_votes[]
+  users        users?         @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  groups       groups?        @relation(fields: [group_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model proof_votes {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  proof_id  String? @db.Uuid
+  user_id   String? @db.Uuid
+  vote_type String?
+  proofs    proofs? @relation(fields: [proof_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users     users?  @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([proof_id, user_id])
+}
+
+model proofs {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id     String?       @db.Uuid
+  task_id     String?       @db.Uuid
+  image_url   String
+  is_valid    Boolean?      @default(false)
+  uploaded_at DateTime?     @default(now()) @db.Timestamp(6)
+  proof_votes proof_votes[]
+  tasks       tasks?        @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users       users?        @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model streaks {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id        String?   @unique @db.Uuid
+  current_streak Int?      @default(0)
+  longest_streak Int?      @default(0)
+  last_updated   DateTime? @db.Timestamp(6)
+  users          users?    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model task_participants {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id         String?   @db.Uuid
+  user_id         String?   @db.Uuid
+  status          String?   @default("opted_in")
+  completion_time DateTime? @db.Timestamp(6)
+  tasks           tasks?    @relation(fields: [task_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users           users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([task_id, user_id])
+}
+
+model tasks {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  group_id          String?             @db.Uuid
+  created_by        String?             @db.Uuid
+  title             String
+  description       String?
+  category          String?
+  task_type         String?
+  scheduled_time    DateTime?           @db.Timestamp(6)
+  duration          Int?
+  created_at        DateTime?           @default(now()) @db.Timestamp(6)
+  activity_logs     activity_logs[]
+  proofs            proofs[]
+  task_participants task_participants[]
+  users             users?              @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  groups            groups?             @relation(fields: [group_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model user_patterns {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id           String?   @db.Uuid
+  habit_type        String?
+  preferred_time    DateTime? @db.Time(6)
+  consistency_score Float?
+  last_analyzed     DateTime? @db.Timestamp(6)
+  users             users?    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model users {
+  id                                   String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                                 String
+  email                                String              @unique
+  avatar_url                           String?
+  total_xp                             Int?                @default(0)
+  streak_count                         Int?                @default(0)
+  reputation_score                     Int?                @default(0)
+  created_at                           DateTime?           @default(now()) @db.Timestamp(6)
+  activity_logs                        activity_logs[]
+  group_members                        group_members[]
+  groups                               groups[]
+  messages_messages_receiver_idTousers messages[]          @relation("messages_receiver_idTousers")
+  messages_messages_sender_idTousers   messages[]          @relation("messages_sender_idTousers")
+  notifications                        notifications[]
+  poll_votes                           poll_votes[]
+  polls                                polls[]
+  proof_votes                          proof_votes[]
+  proofs                               proofs[]
+  streaks                              streaks?
+  task_participants                    task_participants[]
+  tasks                                tasks[]
+  user_patterns                        user_patterns[]
+}
